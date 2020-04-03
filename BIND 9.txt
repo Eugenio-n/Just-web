@@ -1,0 +1,297 @@
+	BIND 9	
+	
+Установить BIND 9 можно введя в терминале следующую команду:
+	sudo apt-get install bind9
+	
+Помещение BIND 9 в "песочницу"
+1.Останавите демон BIND 9
+
+	/etc/init.d/bind9 stop
+
+	Из соображений безопасности лучше запускать BIND в chroot среде, для этого проделайте несколько простых операций.
+
+2.Отредактируйте файл /etc/init.d/bind9, в него надо добавить строку в среде chroot которая будет находится в /var/lib/named. 
+Измените строку OPTIONS=«-u bind» на OPTIONS=«-u bind -t /var/lib/named»
+
+	OPTIONS="-u bind -t /var/lib/named"
+	# Set RESOLVCONF=no to not run resolvconf
+	RESOLVCONF=yes
+	
+	Здесь важно то, что изменять надо файл в папке init.d, а не в папке default! Если не найдете в скрипте init.d, добавьте эти строки.
+	
+3.Создайте необходимые для работы BIND 9 директории.
+
+	mkdir -p /var/lib/named/etc
+	mkdir /var/lib/named/dev
+	mkdir -p /var/lib/named/var/cache/bind
+	mkdir -p /var/lib/named/var/run/bind/run
+	
+4.Переместите директорию с конфигурацией BIND 9 из /etc в /var/lib/named/etc:
+	
+	mv /etc/bind /var/lib/named/etc
+
+5.Создайте символическую ссылку на новую директорию с файлами конфигурации BIND на случай если в дальнейшем вы соберётесь обновить пакет, это поможет избежать проблем.
+
+	ln -s /var/lib/named/etc/bind /etc/bind
+	
+6.Создайте необходимые устройства и установите права на каталоги
+
+	mknod /var/lib/named/dev/null c 1 3
+	mknod /var/lib/named/dev/random c 1 8
+	chmod 666 /var/lib/named/dev/null /var/lib/named/dev/random
+	chown -R bind:bind /var/lib/named/var/*
+	chown -R bind:bind /var/lib/named/etc/bind
+	
+Настройка BIND 9
+
+1. I этап - настройка зон – создаем отдельный файл конфигураций для наших зон ( в данном случае у нас будет одна зона описывающая несуществующий домен .ex):
+
+	touch /var/lib/named/etc/bind/myzones.conf
+	chown bind:bind /var/lib/named/etc/bind/myzones.conf
+	
+2. Теперь отредактируем файл конфигурации нашей зоны .ex (имя вашего домена) /var/lib/named/etc/bind/myzones.conf добавив следующее (.ex - имя вашего домена)
+
+	zone "ex." {
+		 type master;
+		 file "/etc/bind/db.ex";
+	};
+	
+В данном случаем мы специально создаем «несуществующую зону», так как настраиваем BIND для локальной сети – основная задача настроить кэширующий ДНС 
+с возможностью обработки локальных имен/адресов (посредством создания зоны .ex и прямой и обратной зоны для локальной сети 192.168.1.0/24)
+
+3. Теперь создадим файл зоны (прямой) для локальной сети
+
+	touch /var/lib/named/etc/bind/db.ex
+	chown bind:bind /var/lib/named/etc/bind/db.ex
+	nano /var/lib/named/etc/bind/db.ex
+	
+И заполните файл как показано ниже
+	
+	1  $TTL    86400           ; 1 day
+	2  @       IN SOA ex. root.ex. (
+	3          2014110201      ; serial
+	4          10800           ; refresh (3 hours)
+	5          900             ; retry (15 minutes)
+	6          604800          ; expire (1 week)
+	7          86400           ; minimum (1 day)
+	8          )
+	9  @       IN NS ns.ex.         
+	10 
+	11 ns      A 127.0.0.1
+	12 server  A 192.168.1.1 ; адрес вашего сервера в вашей сети
+	
+4.Теперь создадим файл обратной зоны для локальной сети local.rev
+
+	touch /var/lib/named/etc/bind/local.rev
+	chown bind:bind /var/lib/named/etc/bind/local.rev
+	nano /var/lib/named/etc/bind/local.rev 
+
+и заполните его:
+	1  $TTL    604800
+	2  @       IN SOA ex. root.ex. (
+	3          2014110201      ; Serial
+	4          604800          ; Refresh
+	5          86400           ; Retry
+	6          2419200         ; Expire
+	7          604800 )        ; Negative Cache TTL
+	8  ;          
+	9  @       IN NS localhost.
+	10 1       PTR server.ex.
+
+5. Редактируем файл /var/lib/named/etc/bind/named.conf.options
+
+	nano /var/lib/named/etc/bind/named.conf.options
+	
+	и впишите туда несколько опций усложняющих жизнь хакерам и отключим поддержку IPv6:
+	1  version "My DNS v.UnKnown";
+	2     allow-recursion {"homenet";};
+	3     allow-query {any;};
+	4     //auth-nxdomain no;    # conform to RFC1035 - закомментируем
+	5     listen-on-v6 { none; }; # отключим поддержку IPv6
+
+6. Напоследок отредактируем файл /var/lib/named/etc/named.conf
+
+	nano /var/lib/named/etc/bind/named.conf
+	
+во первых включим в конце в конец файла наш файл зон
+
+	1  include "/etc/bind/myzones.conf";
+	
+В начале файла, до включения файла с опциями (named.conf.options), создадим список acl для указания, что будет обслуживать наш сервер BIND, указав нашу подсеть, обратную петлю и оба ДНС провайдера
+	
+	1  acl homenet {
+	2      192.168.1.0/24;
+	3      127.0.0.1;
+	4      8.8.8.8;
+	5      8.8.4.4;
+	6  };
+	
+Для возможности работы передачи зоны с подписью TSIG включаем rndc.key и указываем кто сможет управлять нашим сервером и по какому порту controls
+
+	1  include "/etc/bind/rndc.key";
+	2  controls {
+	3      inet 127.0.0.1 port 953 allow { 127.0.0.1; } keys {rndc-key;};
+	4  };
+	
+И в конце файла добавляем настройку обратной зоны для локальной сети
+
+	1  zone "1.168.192.in-addr.arpa" {
+	2          type master;
+	3          file "/etc/bind/local.rev";
+	4  };
+	
+и подключаем файл с нашей зоной myzones.conf
+
+	1  include "/etc/bind/myzones.conf";
+
+7.Для того, чтобы логи собирались в отдельный файл named.log, и не «сорили» в системные файлы – создадим в нашей «песочнице» (в папке, созданной ранее /var/lib/named/var/log),
+файл для логов и сделаем символическую ссылку в обычную папку log:
+
+	touch /var/lib/named/var/log/named.log
+	chown bind:bind /var/lib/named/var/log/named.log
+	chmod 666 /var/lib/named/var/log/named.log
+	ln -s /var/lib/named/var/log/named.log /var/log/bind.log
+	
+	
+8.И добавим в файл named.conf конфигурации в самый конец детальную настройку работы логов:
+
+	acl homenet {
+		192.168.1.0/24;
+		127.0.0.1;
+		82.209.240.241;
+		82.209.243.241;
+		};
+	 
+	include "/etc/bind/named.conf.options";
+	 
+	include "/etc/bind/rndc.key";
+	 
+	controls {
+		inet 127.0.0.1 port 953 allow { 127.0.0.1; } keys {rndc-key;};
+	};
+	 
+	zone "." {
+			type hint;
+			file "/etc/bind/db.root";
+	};
+	 
+	zone "localhost" {
+			type master;
+			file "/etc/bind/db.local";
+	};
+	 
+	zone "127.in-addr.arpa" {
+			type master;
+			file "/etc/bind/db.127";
+	};
+	 
+	zone "0.in-addr.arpa" {
+			type master;
+			file "/etc/bind/db.0";
+	};
+	 
+	zone "255.in-addr.arpa" {
+			type master;
+			file "/etc/bind/db.255";
+	};
+	 
+	zone "1.168.192.in-addr.arpa" {
+			type master;
+			file "/etc/bind/local.rev";
+	};
+	 
+	include "/etc/bind/myzones.conf";
+	logging {
+			channel myfile {
+					file "/var/log/named.log" versions 10 size 1m;
+					severity dynamic;
+					print-category yes;
+					print-severity yes;
+					print-time yes;
+					};
+	 
+			category config {
+					myfile;
+					};
+			category default {
+					myfile;
+					};
+			category queries {
+					myfile;
+					};
+			category lame-servers {
+					null;
+					};
+	};
+
+
+9.Изменим файл /etc/resolv.conf, вписав туда свой домен первой строкой, в нашем случае это
+
+	1  search ex
+	
+10.Перезапускаем bind9 и перечитываем файлы зон
+	
+	/etc/init.d/bind9 restart
+	rndc reload
+	
+11. И проверка на сервере:
+
+	nslookup
+	> set q=any
+	> localhost
+	Server:         82.209.240.241
+	Address:        82.209.240.241#53
+	localhost
+			origin = localhost
+			mail addr = root.localhost
+			serial = 1
+			refresh = 604800
+			retry = 86400
+			expire = 2419200
+			minimum = 604800
+	localhost       nameserver = localhost.
+	Name:   localhost
+	Address: 127.0.0.1
+	 
+	> 127.0.0.1
+	Server:         82.209.240.241
+	Address:        82.209.240.241#53
+	 
+	1.0.0.127.in-addr.arpa  name = localhost.
+	 
+	> ya.ru
+	Server:         82.209.240.241
+	Address:        82.209.240.241#53
+	 
+	Non-authoritative answer:
+	ya.ru   mail exchanger = 10 mx1.yandex.ru.
+	ya.ru   mail exchanger = 10 mx2.yandex.ru.
+	Name:   ya.ru
+	Address: 213.180.204.8
+	ya.ru   nameserver = ns5.yandex.ru.
+	 
+	Authoritative answers can be found from:
+	ya.ru   nameserver = ns1.yandex.ru.
+	ya.ru   nameserver = ns5.yandex.ru.
+	mx1.yandex.ru   internet address = 77.88.21.89
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

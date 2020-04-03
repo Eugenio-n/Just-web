@@ -1,0 +1,93 @@
+ISc-dhcp-server option 82 
+bind9
+vpn RA
+
+ISc-dhcp-server
+
+Пример установки isc-dhcp-server
+
+Команда установки:
+	sudo apt-get install isc-dhcp-server
+	
+Откроем первый файл конфигурации:
+	sudo nano /etc/default/isc-dhcp-server
+	
+Укажем в нем имя инетерфейса с которого будут раздаваться IP-адреса (например eth0):
+	INTERFACES="eth0"
+	
+Предположим что этому интерфейсу прописан статический адрес в /etc/network/interfaces:
+	auto eth0
+	iface eth0 inet static
+	address 192.168.5.1
+	netmask 255.255.255.0
+	
+Сделаем резервную копию второго файла конфигурации:
+	sudo mv /etc/dhcp/dhcpd.conf /etc/dhcp/dhcpd.conf.backup
+
+Создадим новый:
+	sudo nano /etc/dhcp/dhcpd.conf
+	
+И внесем в него например следующие параметры:
+	default-lease-time 600;
+	max-lease-time 7200;
+	authoritative;
+	log-facility local7;
+	 
+	shared-network cable {
+	 
+	subnet 192.168.5.0 netmask 255.255.255.0 {
+	range 192.168.5.10 192.168.5.254;
+	option domain-name-servers 192.168.5.1, 8.8.4.4;
+	option domain-name "example.net";
+	option routers 192.168.5.1;
+	option time-servers 192.168.5.1;
+	option broadcast-address 192.168.5.255;
+	default-lease-time 600;
+	max-lease-time 7200;
+	}
+	}
+	
+Все строки параметров в файле конфигурации dhcp заканчиваются точкой с запятой (;). Некоторые параметры могут иметь не одно значение, 
+например, domain-name-servers,  у которого два IP-адреса, разделенные запятой. Строки, начинающиеся с ‘#’, являются комментариями и не обрабатываются сервером dhcp.
+
+Некоторые общие параметры сервера DHCP:
+
+	subnet— Параметр объявляет подсеть (в нашем случае 192.168.35.0 с маской 255.255.255.0)
+	range  – Диапазон выдаваемых адресов ( от 192.168.5.10 до 192.168.5.254).
+	option subnet-mask – Маска сети. ( 255.255.255.0)
+	option broadcast-address – Широковещательный адрес. (192.168.5.255)
+	domain-name-servers – Адреса серверов DNS. (192.168.5.1, 8.8.4.4)
+	option domain-name  – Доменное имя.(example.net)
+	option routers – Определяет IP-адрес вашего шлюза или точки выхода в сеть.(192.168.5.1)
+	
+	
+Чтобы зарезервировать IP-адрес конкретному устройству добавим после «max-lease-time 7200;» (до закрытия кавычки «}»):
+host test {
+  hardware ethernet 00:01:02:aa:bb:cc;
+  fixed-address 192.168.5.101;
+}
+
+Несколько хостов удобнее указывать по одной строке:
+	host test { hardware ethernet 00:01:02:aa:bb:cc; fixed-address 192.168.5.101; }
+	host test2 { hardware ethernet 00:01:aa:aa:bb:cc; fixed-address 192.168.5.104; }
+	
+Проверить запущен ли dhcp сервер можно командами:
+	sudo service isc-dhcp-server status
+	sudo /etc/init.d/isc-dhcp-server status
+	sudo netstat -tulpn | grep :67
+	
+Перезапустим сервер чтобы изменения в файлах конфигурации вступили в силу:
+	sudo service isc-dhcp-server restart
+	sudo /etc/init.d/isc-dhcp-server restart
+	
+Посмотреть выданные IP можно командой:
+	sudo less /var/lib/dhcp/dhcpd.leases
+	
+Пример резервирования IP-адреса  192.168.5.5 за компьютером SERVER:
+	subnet 192.168.5.0 netmask 255.255.255.0 {
+	range 192.168.5.100….
+	.......................................... 
+	host SERVER {
+	  hardware ethernet 08:60:6e:d6:5e:ff;
+	  fixed-address 192.168.5.5;}
+	}
