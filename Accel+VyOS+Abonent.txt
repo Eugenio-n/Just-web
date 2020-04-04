@@ -1,0 +1,29 @@
+Для начала настроим VyOS
+login: vyos
+password: 1234
+
+ПУсть интерфейс eth0 будет подключен к Ацелу, тогда зададим ему ip:
+
+set interfaces ethernet eth0 address '192.168.7.1/30'
+set interfaces ethernet eth0 description 'Accel'
+
+А интерфейс eth1 будет подключен к внешке:
+
+set interfaces ethernet eth1 address '172.20.20.60/24'
+set interfaces ethernet eth1 description 'INET'
+
+Добавим NAT:
+
+set nat source rule 100 outbound-interface 'eth1'
+set nat source rule 100 source address '192.168.7.0/24'
+set nat source rule 100 translation address 'masquerade'
+
+И проделаем еще вот что:
+
+set protocols static route 0.0.0.0/0 next-hop 172.20.20.2
+set system name-server 8.8.8.8
+commit
+save
+
+На Дебиане с ацелом установим ip адрес 192.168.7.2/30
+и маршрут по дефолту 192.168.7.1
