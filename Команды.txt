@@ -31,3 +31,13 @@ vlan 2 - name buh - ex - interface fastEthernet 0/1 - switchport mode access
 
 spanning-tree mode rapid-pvst - переключение свичей на RSTP
 
+Команды для нахождения информации
+	show run
+	show ip int brief
+	show ip route list
+	show vlan brief
+	show cdp neighbors
+	show arp
+	show access-lists
+	show access-group
+	traceroute 

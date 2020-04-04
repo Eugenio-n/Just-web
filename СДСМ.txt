@@ -100,12 +100,13 @@ NAT бывает:
 	
 	Динамический: у нас есть пул белых адресов, каждый из которых присваивается локальному пользователю в рандомном порядке.
 		Настраивается он так:
+		Задаем пул (диапазон) публичных адресов, из которого будет выбираться адрес для натирования
 		ip nat pool lol_pool 198.51.100.3 198.51.100.14 
 
-		Задали пул (диапазон) публичных адресов, из которого будет выбираться адрес для натирования
+		Задаём список доступа, который пропускает все пакеты с адресом источника 172.16.6.х, где х варьируется 0-255.
 		access-list 100 permit ip 172.16.6.0 0.0.0.255 any
 
-		Задаём список доступа, который пропускает все пакеты с адресом источника 172.16.6.х, где х варьируется 0-255.
+		И запускаем
 		ip nat inside source list 100 pool lol_pool
 		
 	Перегруженный: один белый адрес присваивается группе локальных пользователей
@@ -163,14 +164,50 @@ NAT бывает:
 	msk-arbat-gw1(config-ext-nacl)# permit ip host 172.16.6.61 any
 	msk-arbat-gw1(config-ext-nacl)# permit ip host 172.16.6.66 any
 
-6) Филиалы в Санкт-Петербурге и Кемерово
+4) Филиалы в Санкт-Петербурге и Кемерово
 Пусть адреса эникиев будут одинаковыми: 172.16.х.222
 	msk-arbat-gw1(config-ext-nacl)# permit ip host 172.16.16.222 any
 	msk-arbat-gw1(config-ext-nacl)# permit ip host 172.16.17.222 any
 	msk-arbat-gw1(config-ext-nacl)# permit ip host 172.16.24.222 any
+	
+Запускаем:
+	msk-arbat-gw1(config)# ip nat inside source list nat-inet pool main_pool overload
+	
+Но счастье не будет полным без настройки интерфейсов:
+На внешнем интерфейсе нужно дать команду ip nat outside
+На внутреннем: ip nat inside
+	msk-arbat-gw1(config)# int gig0/1.101
+	msk-arbat-gw1(config-subif)# ip nat inside 
+	msk-arbat-gw1(config)# int gig0/1.102
+	msk-arbat-gw1(config-subif)# ip nat inside 
+	msk-arbat-gw1(config)# int gig0/1.103
+	msk-arbat-gw1(config-subif)# ip nat inside 
+	msk-arbat-gw1(config)# int gig0/1.104
+	msk-arbat-gw1(config-subif)# ip nat inside 
+	msk-arbat-gw1(config)# int gig0/2.6
+	msk-arbat-gw1(config-subif)# ip nat outside 
+	
+Это позволит маршрутизатору понять откуда ждать пакеты, которые нужно будет обработать и куда их потом слать.
 
+Ну а теперь сделаем проброс портов, чтобы мы могли подключться к нашим серверам извне. 
+a) Веб-сервер
+	msk-arbat-gw1(config)# ip nat inside source static tcp 172.16.0.2 80 198.51.100.2 80
+И укажем тип порта, что бы маршрутизатор понимал куда слать запрос
+	msk-arbat-gw1(config)# int gig0/1.3
+	msk-arbat-gw1(config-subif)# ip nat inside
 
+б) Файловый сервер
+	msk-arbat-gw1(config)# ip nat inside source static tcp 172.16.0.3 20 198.51.100.3 20
+	msk-arbat-gw1(config)# ip nat inside source static tcp 172.16.0.3 21 198.51.100.3 21
+Вот для этого в ACL Servers-out мы открывали также и 20-21-й порты для всех
 
+в) Почтовый сервер
+	msk-arbat-gw1(config)# ip nat inside source static tcp 172.16.0.4 25 198.51.100.4 25
+	msk-arbat-gw1(config)# ip nat inside source static tcp 172.16.0.4 110 198.51.100.4 110
+
+г) Доступ по RDP к компьютерам админа и нашему
+	msk-arbat-gw1(config)# ip nat inside source static tcp 172.16.6.61 3389 198.51.100.10 3389
+	msk-arbat-gw1(config)# ip nat inside source static tcp 172.16.6.66 3389 198.51.100.10 3398
 
 
 
