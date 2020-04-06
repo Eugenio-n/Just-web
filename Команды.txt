@@ -41,3 +41,6 @@ spanning-tree mode rapid-pvst - переключение свичей на RSTP
 	show access-lists
 	show access-group
 	traceroute 
+	
+	show ip igmp groups - юникастовая таблица маршрутизации
+	show ip mroute 224.2.2.4 - мультикастовая таблица маршрутизации
