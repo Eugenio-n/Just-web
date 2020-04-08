@@ -329,7 +329,18 @@ LSDB
 	msk-arbat-gw1(config)#router OSPF 1
 	msk-arbat-gw1(config-router)#passive-interface fastEthernet 0/0.2 
 	
+EIGRP
 
+
+VPN
+
+
+GRE
+Generic Routing Encapsulation – очень простой протокол туннелирования.
+
+Для примера возьмем абстрактную сеть, в которой надо соеденить через туннель 2 клиентов. Каждый из которых подключен к своему маршрутизатору, а между маршрутизаторами большая сеть.
+
+Client1:	 
 
 
 	
