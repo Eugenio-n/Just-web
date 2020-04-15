@@ -438,7 +438,80 @@ R22
 	ip access-list extended nat-inet
 	deny ip 192.168.2.0 0.0.0.255 192.168.1.0 0.0.0.255
 	
+BGP
+Пусть наша сеть состоит из 4 AS, каждую из которых будет представлять маршрутизатор. Все они соеденины кольцом.
+R1
+	AS:	64500
+	gig0/0:	101.0.0.2/30
+	gig0/1:	102.0.0.2/30
+	network: 100.0.0.0/23
+	loopback0: 100.0.110.1/32
 	
+R2
+	AS:	64501
+	gig0/0:	101.0.0.1/30
+	gig0/1:	101.0.0.5/30
+	gig0/2:	101.0.0.9/30
+	network: 101.0.0.0/20
+	loopback0: 101.0.120.1/32
+	
+R3
+	AS:	64503
+	gig0/0:	101.0.0.10/30
+	gig0/0:	102.0.0.10/30
+	network: 103.0.0.0/22
+	network: 120.0.0.0/24
+	loopback0: 103.0.130.0/32
+
+R4
+	AS:	64502
+	gig0/0:	101.0.0.6/30
+	gig0/1:	102.0.0.1/30
+	gig0/2:	102.0.0.9/30
+	network: 102.0.0.0/21
+	loopback0: 102.0.140.1/32
+	
+
+
+Настройка BGP:
+
+R1
+	router bgp 64500
+	neighbor 101.0.0.1  remote-as 64501
+	neighbor 101.0.0.6  remote-as 64502
+	network  100.0.0.0  mask 255.255.254.0
+	
+R2
+	router bgp 64501
+	neighbor 101.0.0.2  remote-as 64500
+	neighbor 101.0.0.10 remote-as 64503
+	neighbor 101.0.0.6  remote-as 64502
+	network  101.0.0.0  mask 255.255.240.0
+	
+
+R3
+	router bgp 64503
+	neighbor 101.0.0.9  remote-as 64501
+	neighbor 102.0.0.9  remote-as 64502
+	network  103.0.0.0  mask 255.255.252.0
+	network  120.0.0.0  mask 255.255.255.0
+
+R4
+	router bgp 64502
+	neighbor 102.0.0.10 remote-as 64503
+	neighbor 101.0.0.5  remote-as 64501
+	neighbor 102.0.0.2  remote-as 64500
+	network  102.0.0.0  mask 255.255.248.0
+
+
+	
+	
+	
+	
+	
+
+	
+
 	
 	
 	
