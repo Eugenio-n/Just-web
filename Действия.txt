@@ -212,5 +212,257 @@
 	-заходим на сабинтерфейсы и прописываем каждому следующее:
 	-ip helper-address 192.168.4.2 (это ip сервера)
   
-  
+ NAT
+ Пусть у нас последовательно подключены 3 маршрутизатора, R11 и R22 - абонентские, а R3 представляет собой интернет.
+R11:
+	gig0/0: 210.210..1.2/30 R3
+	gig0/1: 192.168.1.1/24  SW
+
+R22:
+	gig0/0: 210.210.2.2/30  R3
+	gig0/1: 192.168.2.1/24  SW
+	
+R33:
+	int gig0/1: 210.210.1.1/30 R11
+	int gig0/2: 210.210.2.1/30 R22
+	
+Настройка состоит из следующих этапов:
+	Указываем какие порты у нас внешние (outside), а какие внутренние (inside)
+	Задаем пул белых ip-адресов
+	Создаем расширенный ACL 
+	Прописываем правила
+	Добавим еще дефолтный маршрут
+	И запускам наш NAT, где укажем нашу ACL и пул адресов (можно было указать и интерфейс)
+	
+R11:
+	int gig0/1
+	ip nat inside
+	int gig0/0
+	ip nat outside
+	ip nat pool main_pool 210.210.1.2 210.210.1.14 netmask 255.255.255.240
+	ip access-list extended nat-inet
+	permit ip 192.168.1.0 0.0.0.255 any
+	ip route 0.0.0.0 0.0.0.0 210.210.1.1
+	ip nat inside source list nat-inet pool main_pool overload
+	
+R22:
+	int gig0/1
+	ip nat inside
+	int gig0/0
+	ip nat outside
+	ip nat pool main_pool 210.210.2.2 210.210.2.14 netmask 255.255.255.240
+	ip access-list extended nat-inet
+	permit ip 192.168.2.0 0.0.0.255 any
+	ip route 0.0.0.0 0.0.0.0 210.210.2.1
+	ip nat inside source list nat-inet pool main_pool overload
+	
+ 
+ 
+ 
+ 
+ OSPF
+ Пусть у нас последовательно подключены 3 маршрутизатора в виде треугольника (кольцо), и к каждому из них подключен ПК.
+ R1:
+	gig0/0: 192.168.1.1/24 PC
+	gig0/1: 10.10.10.1/30  R3
+	gig0/2: 10.10.11.1/30  R2
+
+R2:	
+	gig0/0: 192.168.2.1/24 PC
+	gig0/1: 10.10.10.2/30  R1
+	gig0/2: 10.10.12.1/30  R3
+	
+R3:
+	gig0/0: 192.168.3.1/24 PC
+	gig0/1: 10.10.11.2/30  R3
+	gig0/2: 10.10.12.1/30  R2
+	
+Тогда настройка каждого из них будет следующей:
+R1:
+	int loopback0 
+	ip address 192.168.100.1 255.255.255.255
+	router ospf 1
+	network 192.168.1.0 0.0.0.255 area 0
+	network 10.10.10.0 0.0.0.3 area 0
+	network 10.10.11.0 0.0.0.3 area 0
+	
+R2:
+	int loopback0 
+	ip address 192.168.100.2 255.255.255.255
+	router ospf 1
+	network 192.168.2.0 0.0.0.255 area 0
+	network 10.10.10.0 0.0.0.3 area 0
+	network 10.10.12.0 0.0.0.3 area 0
+	
+R3:
+	int loopback0 
+	ip address 192.168.100.3 255.255.255.255
+	router ospf 1
+	network 192.168.2.0 0.0.0.255 area 0
+	network 10.10.11.0 0.0.0.3 area 0
+	network 10.10.12.0 0.0.0.3 area 0
+	
+GRE
+Пусть у нас последовательно подключены 3 маршрутизатора. К конечным из них подключен ПК (R1, R2). А средний в роли "интернета" (R3).
+И на всех из них настроена маршрутизация. Например, тот же OSPF.
+
+Конфиг:
+R1:
+	gig0/0:	172.16.0.1/24  PC	
+	gig0/1:	192.168.0.1/24 R3
+	
+R2:
+	gig0/0:	172.16.1.1/24  PC	
+	gig0/1:	192.168.1.1/24 R3
+
+R3:
+	gig0/0:	192.168.0.2	/24  R1	
+	gig0/1:	192.168.1.2/24 R2	
+	
+ Тогда туннель делается следующим образом:
+ R1:
+	int Tunnel0											-создаем интерфейс Tunnel0
+	tunnel source gig0/1								-указываем из какого порта будет прокинут туннель
+	tunnel destination 192.168.1.1						-указываем до какого адреса прокидываем туннель
+	ip addr 10.0.0.1 255.255.255.0						-ip-адрес нашего маршрутизатора в туннеле
+	ip route 172.16.1.0 255.255.255.0 10.0.0.2			-и указываем, чтобы все запросы на сеть 172.16.1.0 отправляли на адрес 10.0.0.2 - ip конечного маршрутизатора
+
+ R2:
+	int Tunnel0
+	tunnel source gig0/1
+	tunnel destination 192.168.0.1
+	ip addr 10.0.0.2 255.255.255.0
+	ip route 172.16.0.0 255.255.255.0 10.0.0.1
+	
+IPSec
+Пусть у нас последовательно подключены 3 маршрутизатора, R11 и R22 - абонентские, а R3 представляет собой интернет.
+R11:
+	gig0/0: 210.210..1.2/30 R3
+	gig0/1: 192.168.1.1/24  SW
+
+R22:
+	gig0/0: 210.210.2.2/30  R3
+	gig0/1: 192.168.2.1/24  SW
+	
+R33:
+	int gig0/1: 210.210.1.1/30 R11
+	int gig0/2: 210.210.2.1/30 R22
+	
+Для начала настроим на них NAT
+	
+Настройка состоит из следующих этапов:
+	Указываем какие порты у нас внешние (outside), а какие внутренние (inside)
+	Задаем пул белых ip-адресов
+	Создаем расширенный ACL 
+	Прописываем правила
+	Добавим еще дефолтный маршрут
+	И запускаем наш NAT, где укажем нашу ACL и пул адресов (можно было указать и интерфейс)
+	
+R11:
+	int gig0/1
+	ip nat inside
+	int gig0/0
+	ip nat outside
+	ip nat pool main_pool 210.210.1.2 210.210.1.14 netmask 255.255.255.240
+	ip access-list extended nat-inet
+	permit ip 192.168.1.0 0.0.0.255 any
+	ip route 0.0.0.0 0.0.0.0 210.210.1.1
+	ip nat inside source list nat-inet pool main_pool overload
+	
+R22:
+	int gig0/1
+	ip nat inside
+	int gig0/0
+	ip nat outside
+	ip nat pool main_pool 210.210.2.2 210.210.2.14 netmask 255.255.255.240
+	ip access-list extended nat-inet
+	permit ip 192.168.2.0 0.0.0.255 any
+	ip route 0.0.0.0 0.0.0.0 210.210.2.1
+	ip nat inside source list nat-inet pool main_pool overload
+
+А теперь приступим к настройке самого IPSec туннеля.
+
+R11
+Настройка первой фазы:
+	crypto isakmp policy 1  //создаем политику
+	encr 3des               //указываем алгоритм шифрования
+	hash md5				//укажем алгоритм хеширования
+	authentication pre-share//тип аутентификации - прешаред ключ
+	group 2					//алгоритм, необходим для обмена прешаред ключами
+
+Настройка ключа аутентификации и пира:
+	crypto isakmp key cisco address 210.210.2.2 //указываем сам прешаред ключ и адрес роутера, с которым будем строить VPN подключение
+
+Вторая фаза
+crypto ipsec transform-set TS esp-3des esp-md5-hmac	//указываем параметры, необходимые для построения ipsec туннеля
+
+Определяем какой трафик шифровать
+	ip access-list extended FOR-VPN
+	permit ip 192.168.1.0 0.0.0.255 192.168.2.0 0.0.0.255
+
+Создаем криптокарту
+	crypto map CMAP 10 ipsec-isakmp
+	set peer 210.210.2.2 
+	set transform-set TS
+	match address FOR-VPN	//указываем какой трафик шифровать
+
+Привязка к интерфейсу 
+	interface gig0/0
+	crypto map CMAP
+
+Поправим наш NAT:
+	ip access-list extended nat-inet
+	deny ip 192.168.1.0 0.0.0.255 192.168.2.0 0.0.0.255
+
+	
+R22
+
+	crypto isakmp policy 1
+	encr 3des         
+	hash md5	
+	authentication pre-share
+	group 2
+	ex
+	crypto isakmp key cisco address 210.210.1.2
+	crypto ipsec transform-set TS esp-3des esp-md5-hmac
+	ip access-list extended FOR-VPN
+	permit ip 192.168.2.0 0.0.0.255 192.168.1.0 0.0.0.255
+	crypto map CMAP 10 ipsec-isakmp
+	set peer 210.210.2.2 
+	set transform-set TS
+	match address FOR-VPN 
+	ex
+	interface gig0/0
+	crypto map CMAP
+	ex
+	ip access-list extended nat-inet
+	deny ip 192.168.2.0 0.0.0.255 192.168.1.0 0.0.0.255
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
   

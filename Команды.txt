@@ -1,35 +1,25 @@
-﻿banner motd " сообщение дня "
+﻿DCN
 
-service password-encryption
+sh run - показать весь конфиг
+sh int - показать всю инфу по портам
+sh int eth номер порта- показать инфу по конкретному порту
+sh mac-addres table - показать инфу по таблице мак-адерсов
+conf t - зайти в режим конфигурации
+int eth - зайти на порт в режиме конфигурации
+shut - выключить порт
+no shut - включить порт
+name - переименовать порт
 
-show running-config
-
-show ip dhcp binding - просмотр адресов, если они выданы маршрутизатором
-
-show spanning-tree - для просмотра корневого коммутатора
-
-show mac address-table - таблица мак-адрессов по вланам и портам
-
-show vlan brief - показать таблицу вланов
-
-write memory - запись текущей конфигурации в память
-
-username admin privilege 15 password cisco - создаем пользователя admin с уровнем привилигии 15 и паролем cisco
-
-copy running-config startup-config (copy run start) - записываем нынешнюю конфигурации в файл загрузки
-
-copy startup-config running-config (copy start run) - записываем загрузочную конфигурацию в данную
-
-enable secret cisco - устаналиваем секретный пароль cisco
-
-enable password cisco - устаналиваем пароль cisco на вход в привилигорованный режим
-
-hostname S1 - задаем имя в консоли данному устройству
-
-vlan 2 - name buh - ex - interface fastEthernet 0/1 - switchport mode access
-- switchport access vlan 2 - создание влана 2 и добавление к нему интерфейса
-
-spanning-tree mode rapid-pvst - переключение свичей на RSTP
+HP
+sh run - показать весь конфиг
+sh int - показать всю инфу по портам
+sh int eth номер порта- показать инфу по конкретному порту
+sh mac-addres table - показать инфу по таблице мак-адерсов
+conf t - зайти в режим конфигурырации
+int eth - зайти на порт в режиме конфигурации
+disable - выключить порт
+enable - включить порт
+name - переименовать порт
 
 Команды для нахождения информации
 	show run
@@ -41,3 +31,27 @@ spanning-tree mode rapid-pvst - переключение свичей на RSTP
 	show access-lists
 	show access-group
 	traceroute 
+	
+	show ip igmp groups - юникастовая таблица маршрутизации
+	show ip mroute 224.2.2.4 - мультикастовая таблица маршрутизации
+
+
+
+banner motd " сообщение дня "
+service password-encryption
+show running-config
+show ip dhcp binding - просмотр адресов, если они выданы маршрутизатором
+show spanning-tree - для просмотра корневого коммутатора
+show mac address-table - таблица мак-адрессов по вланам и портам
+show vlan brief - показать таблицу вланов
+write memory - запись текущей конфигурации в память
+username admin privilege 15 password cisco - создаем пользователя admin с уровнем привилигии 15 и паролем cisco
+copy running-config startup-config (copy run start) - записываем нынешнюю конфигурации в файл загрузки
+copy startup-config running-config (copy start run) - записываем загрузочную конфигурацию в данную
+enable secret cisco - устаналиваем секретный пароль cisco
+enable password cisco - устаналиваем пароль cisco на вход в привилигорованный режим
+hostname S1 - задаем имя в консоли данному устройству
+vlan 2 - name buh - ex - interface fastEthernet 0/1 - switchport mode access
+- switchport access vlan 2 - создание влана 2 и добавление к нему интерфейса
+spanning-tree mode rapid-pvst - переключение свичей на RSTP
+

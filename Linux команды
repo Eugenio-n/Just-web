@@ -1,0 +1,10 @@
+Здесь будут собраны основные команды по линуксу, которые всегда пригодятся.
+
+Network
+	systemctl status networking
+	service networking status
+	/etc/init.d/networking restart
+	/etc/init.d/networking stop 
+	/etc/init.d/networking start
+	ip addr
+	https://www.cyberciti.biz/faq/linux-route-add/
