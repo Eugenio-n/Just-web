@@ -334,6 +334,8 @@ R3:
 	ip addr 10.0.0.2 255.255.255.0
 	ip route 172.16.0.0 255.255.255.0 10.0.0.1
 	
+	
+	
 IPSec
 Пусть у нас последовательно подключены 3 маршрутизатора, R11 и R22 - абонентские, а R3 представляет собой интернет.
 R11:
@@ -438,6 +440,7 @@ R22
 	ip access-list extended nat-inet
 	deny ip 192.168.2.0 0.0.0.255 192.168.1.0 0.0.0.255
 	
+	
 BGP
 Пусть наша сеть состоит из 4 AS, каждую из которых будет представлять маршрутизатор (+свитч+пк). Все они соеденины кольцом.
 R1
@@ -497,15 +500,14 @@ SW4
 R1
 	router bgp 64500
 	neighbor 101.0.0.1  remote-as 64501
-	neighbor 101.0.0.6  remote-as 64502
+	neighbor 102.0.0.1  remote-as 64502
 	network  10.0.0.0  mask 255.255.254.0
-	ip route 10.0.0.0 255.255.254.0 10.0.1.1 ?????????
+
 	
 R2
 	router bgp 64501
 	neighbor 101.0.0.2  remote-as 64500
 	neighbor 101.0.0.10 remote-as 64503
-	neighbor 101.0.0.6  remote-as 64502
 	network  11.0.0.0  mask 255.255.240.0
 	
 
@@ -514,21 +516,50 @@ R3
 	neighbor 101.0.0.9  remote-as 64501
 	neighbor 102.0.0.9  remote-as 64502
 	network  13.0.0.0  mask 255.255.252.0
-	network  14.0.0.0  mask 255.255.255.0
+	network  14.0.1.0  mask 255.255.255.0
 
 R4
 	router bgp 64502
 	neighbor 102.0.0.10 remote-as 64503
-	neighbor 101.0.0.5  remote-as 64501
 	neighbor 102.0.0.2  remote-as 64500
 	network  102.0.0.0  mask 255.255.248.0
 
+AS-Path ACL
 
+Чтобы от соседа получать только интернетовские маршруты и не получать его собственные, то есть его сети, можно воспользоваться правилом сортировки:
+
+	ip as-path access-list 100 deny ^64501$ - запрещаем принимать все маршруты, которые непосредственно зародились в AS 64501
+	ip as-path access-list 100 permit .*    - разрешаем все остальное
+
+	router bgp 64500						- заходим в натройки BGP на интересующем роутере
+	neighbor 101.0.0.1 filter-list 100 in	- применяем фильтр на неужном соседе.
 	
 	
+Route Map
+
+Укажем, что в подсеть 14.0.1.0/24 предпочтительно ходить через R4_, а в 13.0.0.0/22 через R2_. Для этого воспользуемся атрибутом Local Preference. Чем выше значение этого параметра, тем выше приоритет маршрута.
+
+	ip prefix-list TEST1_IN seq 5 permit 14.0.1.0/24	-создаем префикс лист, выделяем сеть и укажем permit, обозначающее использование Route Map для этого префикс-листа
+	ip prefix-list TEST2_IN seq 5 permit 13.0.0.0/22	
+	Как и в обычных ACL далее идёт неявное правило deny для всего остального. В данном случае оно означает, что под	действие route-map подпадёт только 14.0.1.0/24 и ничего другого.
 	
-	
-	
+	route-map BGP1_IN permit 10							-создаем карту, даем название, даем номер, разрешаем прохождение маршрутной информации (permit)
+	match ip address prefix-list TEST1_IN				-подпадающей под созданный prefix-list
+	set local-preference 50								-для этих анонсов установим local preference в 50 – ниже, чем стандартные 100
+
+	route-map BGP1_IN permit 20							-установим приоритет 100 для остальных маршрутов
+	set local-preference 100							
+
+	route-map BGP2_IN permit 10							-аналогично делаем и для второго правила
+	match ip address prefix-list TEST2_IN
+	set local-preference 50
+
+	route-map BGP2_IN permit 20
+	set local-preference 100
+
+	router bgp 64500										
+	neighbor 102.0.0.1 route-map BGP2_IN in				-привяжем карту к конкретному BGP-соседу
+	neighbor 101.0.0.1 route-map BGP1_IN in
 
 	
 

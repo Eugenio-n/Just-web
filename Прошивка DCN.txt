@@ -1,7 +1,7 @@
 DCN 3950 R5
 
 Установка новой прошивки
-Подключим наш свитч к офисному свитчу в 6 порт
+Подключим наш свитч к офисному свитчу в 6 порт (верхний)
 int ethernet1/25
 switchport mode access
 switchport access vlan 1
@@ -14,24 +14,21 @@ tftp-server enable
 exit
 ping 172.16.100.4
 wr
-copy tftp://172.16.100.4/Firmware/DCN/dcrs_3950_v5/boot.rom boot.romen
-
+copy tftp://172.16.100.4/Firmware/DCN/dcrs_3950_v5/boot.rom boot.romen			//эти 2 не обязательно, главное - залить конфиг
 copy tftp://172.16.100.4/Firmware/DCN/dcrs_3950_v5/nos.img nos.img
-wr
-reload
-
-
-
 copy tftp://172.16.100.4/Configs/Region1/sw-acc1_ubil36.r1.cfg flash:/startup.cfg
-copy running.cfg startup.cfg
-delete running.cfg
 boot startup-config startup.cfg
 reload
 
 Для сброса к заводским:
-set default
-wr
-reload
+	set default
+	wr
+	reload
+
+Честно, не знаю для чего это, но когда не загружал с новой, то это помогло
+	copy running.cfg startup.cfg
+	delete running.cfg	
+
 
 Как сгенерить новый конфиг для DCN
 Только сначала надо отключиться от офисной сетки
@@ -42,3 +39,7 @@ reload
 
 Для того чтобы сгенерить конфиг нужно запустить генератор с такими ключами:
 /var/tftp/Configs/Region1# ./acc-gen-dcn.py --abon-subnet 10.192.60.0/24 --abon-vlan-id 360 --abon-vlan-name 360r1 --mgmt-subnet 172.17.1.0/24 --mgmt-vlan-id 101 --mgmt-vlan-ip 172.16.1.62 --sw-location '50letBSSR_13-2' --sw-hostname sw-acc1-50let13-2.r1 --sw-ports 28 --uplink-name 'sw-agg1-kozh26.r1'
+
+
+Бывает, что тот же 25 порт дублируется и на оптику. Чтобы его переключить, нужно зайти на него и ввести
+media-type copper
